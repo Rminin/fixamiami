@@ -15,6 +15,7 @@ app.get("/eng/detail", async (req, res) => {
   try {
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
