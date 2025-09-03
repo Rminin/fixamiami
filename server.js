@@ -26,19 +26,49 @@ app.get("/eng/detail", async (req, res) => {
 
   try {
     const browser = await puppeteer.launch({
-      headless: true,
+      headless: "new", // safer than true/false across environments
       executablePath: CHROME_PATH, // optional
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+
+    // Realistic browser signals
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+    );
+    await page.setViewport({ width: 1366, height: 768 });
+    await page.setExtraHTTPHeaders({
+      "accept-language": "en-US,en;q=0.9",
     });
 
-    const page = await browser.newPage();
+    console.log(`Navigating to ${targetUrl}`);
     await page.goto(targetUrl, {
       waitUntil: "domcontentloaded",
-      timeout: 60000
+      timeout: 60000,
     });
 
-    await page.waitForSelector(".item-detail__slider img", { timeout: 15000 });
-    await page.waitForSelector(".item-detail__price_selling-price", { timeout: 15000 }).catch(() => {});
+    // Debug dump of HTML
+    const html = await page.content();
+    console.log("=== HTML snippet ===");
+    console.log(html.slice(0, 500));
+    console.log("====================");
+
+    // Check selectors manually before waiting
+    const hasImg = await page.$(".item-detail__slider img") !== null;
+    const hasPrice =
+      (await page.$(".item-detail__price_selling-price")) !== null;
+
+    console.log("Selector check:", { hasImg, hasPrice });
+
+    // Wait for main image and selling price
+    await page
+      .waitForSelector(".item-detail__slider img", { timeout: 15000 })
+      .catch(() => console.warn("Image selector timeout"));
+    await page
+      .waitForSelector(".item-detail__price_selling-price", {
+        timeout: 15000,
+      })
+      .catch(() => console.warn("Price selector timeout"));
 
     const data = await page.evaluate(() => {
       const title = document.querySelector(".item-detail__section-title")?.innerText.trim() || "AmiAmi Product";
