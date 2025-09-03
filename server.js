@@ -24,15 +24,19 @@ app.get("/eng/detail", async (req, res) => {
       timeout: 60000,
     });
 
-    // Wait for main image to load
+    // Wait for main image and selling price to appear
     await page.waitForSelector(".item-detail__slider img", { timeout: 15000 });
+    await page.waitForSelector(".item-detail__price_selling-price", { timeout: 15000 }).catch(() => {});
 
     const data = await page.evaluate(() => {
-      const title = document.querySelector("title")?.innerText.trim() || "AmiAmi Product";
+      const title = document.querySelector(".item-detail__section-title")?.innerText.trim() || "AmiAmi Product";
+
       const imgEl = document.querySelector(".item-detail__slider img");
       const image = imgEl ? imgEl.getAttribute("src") : "";
-      const priceEl = document.querySelector(".item-detail__price .price");
-      const price = priceEl ? priceEl.textContent.trim() : "";
+
+      const priceEl = document.querySelector(".item-detail__price_selling-price");
+      const price = priceEl ? priceEl.textContent.trim().replace(/\s+/g, '') : "";
+
       return { title, image, price };
     });
 
@@ -67,5 +71,5 @@ app.get("/eng/detail", async (req, res) => {
 });
 
 app.listen(3000, () => {
-  console.log("FixAmiAmi (stealth) server running at http://localhost:3000");
+  console.log("FixAmiAmi Puppeteer server running at http://localhost:3000");
 });
