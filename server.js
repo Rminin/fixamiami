@@ -7,14 +7,12 @@ puppeteer.use(StealthPlugin());
 
 const app = express();
 
-// Auto-detect Chrome/Chromium executable
+// Optional local Chrome detection
 function getChromePath() {
-  // Render Linux path
-  if (fs.existsSync("/usr/bin/chromium")) return "/usr/bin/chromium";
-  // Common Windows path
+  // Local Windows Chrome
   const winChrome = "C:/Program Files/Google/Chrome/Application/chrome.exe";
   if (fs.existsSync(winChrome)) return winChrome;
-  // Default fallback: let puppeteer-core auto-detect
+  // Otherwise, use bundled Chromium
   return undefined;
 }
 
@@ -29,17 +27,16 @@ app.get("/eng/detail", async (req, res) => {
   try {
     const browser = await puppeteer.launch({
       headless: true,
-      executablePath: CHROME_PATH,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      executablePath: CHROME_PATH, // optional
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
     await page.goto(targetUrl, {
       waitUntil: "domcontentloaded",
-      timeout: 60000,
+      timeout: 60000
     });
 
-    // Wait for main image and selling price to appear
     await page.waitForSelector(".item-detail__slider img", { timeout: 15000 });
     await page.waitForSelector(".item-detail__price_selling-price", { timeout: 15000 }).catch(() => {});
 
@@ -61,13 +58,11 @@ app.get("/eng/detail", async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <title>${data.title}</title>
-
         <meta property="og:title" content="${data.title}">
         <meta property="og:description" content="${data.price || "AmiAmi product listing"}">
         <meta property="og:image" content="${data.image}">
         <meta property="og:url" content="${targetUrl}">
         <meta property="og:type" content="website">
-
         ${debug ? "" : `<meta http-equiv="refresh" content="0;url=${targetUrl}" />`}
       </head>
       <body>
