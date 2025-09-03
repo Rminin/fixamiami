@@ -1,0 +1,71 @@
+const express = require("express");
+const puppeteer = require("puppeteer-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+
+puppeteer.use(StealthPlugin());
+
+const app = express();
+
+app.get("/eng/detail", async (req, res) => {
+  const { gcode, debug } = req.query;
+  if (!gcode) return res.status(400).send("Missing gcode");
+
+  const targetUrl = `https://www.amiami.com/eng/detail/?gcode=${gcode}`;
+
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+
+    await page.goto(targetUrl, {
+      waitUntil: "networkidle2",
+      timeout: 60000,
+    });
+
+    // Wait for main image to load
+    await page.waitForSelector(".item-detail__slider img", { timeout: 15000 });
+
+    const data = await page.evaluate(() => {
+      const title = document.querySelector("title")?.innerText.trim() || "AmiAmi Product";
+      const imgEl = document.querySelector(".item-detail__slider img");
+      const image = imgEl ? imgEl.getAttribute("src") : "";
+      const priceEl = document.querySelector(".item-detail__price .price");
+      const price = priceEl ? priceEl.textContent.trim() : "";
+      return { title, image, price };
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>${data.title}</title>
+
+        <meta property="og:title" content="${data.title}">
+        <meta property="og:description" content="${data.price || "AmiAmi product listing"}">
+        <meta property="og:image" content="${data.image}">
+        <meta property="og:url" content="${targetUrl}">
+        <meta property="og:type" content="website">
+
+        ${debug ? "" : `<meta http-equiv="refresh" content="0;url=${targetUrl}" />`}
+      </head>
+      <body>
+        <p>Redirecting to <a href="${targetUrl}">${data.title}</a></p>
+        ${debug ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ""}
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error("Scrape failed:", err);
+    res.status(500).send("Failed to fetch product");
+  }
+});
+
+app.listen(3000, () => {
+  console.log("FixAmiAmi (stealth) server running at http://localhost:3000");
+});
