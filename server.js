@@ -1,10 +1,24 @@
 const express = require("express");
 const puppeteer = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const fs = require("fs");
 
 puppeteer.use(StealthPlugin());
 
 const app = express();
+
+// Auto-detect Chrome/Chromium executable
+function getChromePath() {
+  // Render Linux path
+  if (fs.existsSync("/usr/bin/chromium")) return "/usr/bin/chromium";
+  // Common Windows path
+  const winChrome = "C:/Program Files/Google/Chrome/Application/chrome.exe";
+  if (fs.existsSync(winChrome)) return winChrome;
+  // Default fallback: let puppeteer-core auto-detect
+  return undefined;
+}
+
+const CHROME_PATH = getChromePath();
 
 app.get("/eng/detail", async (req, res) => {
   const { gcode, debug } = req.query;
@@ -15,19 +29,13 @@ app.get("/eng/detail", async (req, res) => {
   try {
     const browser = await puppeteer.launch({
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-zygote",
-        "--single-process"
-      ]
+      executablePath: CHROME_PATH,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
-    const page = await browser.newPage();
 
+    const page = await browser.newPage();
     await page.goto(targetUrl, {
-      waitUntil: "networkidle2",
+      waitUntil: "domcontentloaded",
       timeout: 60000,
     });
 
@@ -37,13 +45,10 @@ app.get("/eng/detail", async (req, res) => {
 
     const data = await page.evaluate(() => {
       const title = document.querySelector(".item-detail__section-title")?.innerText.trim() || "AmiAmi Product";
-
       const imgEl = document.querySelector(".item-detail__slider img");
       const image = imgEl ? imgEl.getAttribute("src") : "";
-
       const priceEl = document.querySelector(".item-detail__price_selling-price");
-      const price = priceEl ? priceEl.textContent.trim().replace(/\s+/g, '') : "";
-
+      const price = priceEl ? priceEl.textContent.trim().replace(/\s+/g, "") : "";
       return { title, image, price };
     });
 
